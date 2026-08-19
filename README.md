@@ -36,13 +36,10 @@ surveyed live on stock ZWO firmware.
 
 ## Install
 
-> **Note:** no prebuilt image has been released yet - see
-> [Build the image yourself](#build-the-image-yourself) below.
-
 ### 1. Download + flash
 
-Once released, grab the latest `openastro-zwo-asiair-pro.img.xz` from the
-[Releases](../../releases) page and flash it to a microSD card (8 GB+) with
+Grab the latest `openastro-zwo-asiair-pro.img.xz` from the
+[latest release](../../releases/latest) page and flash it to a microSD card (8 GB+) with
 [Raspberry Pi Imager](https://www.raspberrypi.com/software/),
 [balenaEtcher](https://etcher.balena.io/), or `dd`:
 
