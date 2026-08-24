@@ -149,9 +149,14 @@ chmod 600 /etc/NetworkManager/system-connections/OpenAstro-AP.nmconnection
 # again on next boot.
 rm -f /var/lib/openastro/ssid-set
 
-# Per-board SSID: suffix with the last 4 hex digits of the wlan0 MAC (unique
-# and burned into the SoC/radio). Runs once on first boot, before NM, so
-# multiple boards at a star party don't collide on the same SSID.
+# Per-board SSID and hostname: suffix both with the last 4 hex digits of the
+# wlan0 MAC (unique and burned into the SoC/radio). Runs once on first boot,
+# before NM, so multiple boards at a star party don't collide on the same SSID,
+# and two boards on one home LAN don't fight over the same DHCP/mDNS name
+# (openastro.local flipping between IPs). The same 4 hex are what AlpacaBridge
+# stamps on DeviceName/UniqueID, so SSID OpenAstro-915D = host openastro-915d
+# = "915D: ..." devices in NINA. The hostname is only suffixed when it is
+# still the image default; a custom OPENASTRO_HOSTNAME is left alone.
 cat > /usr/local/sbin/openastro-ssid <<'EOF'
 #!/bin/bash
 set -euo pipefail
@@ -161,15 +166,21 @@ for _ in $(seq 1 60); do
 done
 mac=$(tr -d ':' < /sys/class/net/wlan0/address)
 suffix=$(echo "${mac: -4}" | tr 'a-f' 'A-F')
-[ ${#suffix} -eq 4 ] || exit 0   # no/odd MAC: keep the generic SSID
+[ ${#suffix} -eq 4 ] || exit 0   # no/odd MAC: keep the generic SSID/hostname
 sed -i "s/^ssid=\(.*\)/ssid=\1-${suffix}/" \
     /etc/NetworkManager/system-connections/OpenAstro-AP.nmconnection
+if [ "$(cat /etc/hostname)" = "openastro" ]; then
+    host="openastro-$(echo "$suffix" | tr 'A-F' 'a-f')"
+    echo "$host" > /etc/hostname
+    sed -i "s/^127\.0\.1\.1[[:space:]].*/127.0.1.1\t${host}/" /etc/hosts
+    hostname "$host"
+fi
 EOF
 chmod 755 /usr/local/sbin/openastro-ssid
 
 cat > /etc/systemd/system/openastro-ssid.service <<'EOF'
 [Unit]
-Description=OpenAstro: per-board AP SSID from wlan0 MAC
+Description=OpenAstro: per-board AP SSID and hostname from wlan0 MAC
 Before=NetworkManager.service
 ConditionPathExists=!/var/lib/openastro/ssid-set
 
