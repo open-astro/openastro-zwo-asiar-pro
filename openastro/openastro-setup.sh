@@ -201,6 +201,36 @@ Wants=openastro-ssid.service
 EOF
 systemctl enable openastro-ssid.service >/dev/null 2>&1
 
+# Pin the CPU governor to performance (AlpacaBridge issue #220): the default
+# ondemand/interactive governor pays a ~100 ms clock-ramp on the first request
+# burst, which showed up as single-member FAST timing blips in ConformU runs
+# (even on I/O-free getters). Pinning performance produced 0 timing violations
+# over five consecutive runs. An astro appliance is on mains power - latency
+# beats the marginal idle savings.
+cat > /usr/local/sbin/openastro-cpufreq <<'EOF'
+#!/bin/sh
+for g in /sys/devices/system/cpu/cpufreq/policy*/scaling_governor; do
+    [ -w "$g" ] && echo performance > "$g" 2>/dev/null
+done
+exit 0
+EOF
+chmod 755 /usr/local/sbin/openastro-cpufreq
+
+cat > /etc/systemd/system/openastro-cpufreq.service <<'EOF'
+[Unit]
+Description=OpenAstro: pin CPU governor to performance
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/openastro-cpufreq
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl enable openastro-cpufreq.service >/dev/null 2>&1
+
+
 # Regdom for the 5 GHz AP. On Raspberry Pi OS WiFi is soft-blocked by rfkill
 # until a country is set - set it every way that sticks in a chroot.
 iw reg set "${AP_COUNTRY}" 2>/dev/null || true
